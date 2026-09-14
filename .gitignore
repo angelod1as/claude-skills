@@ -1,0 +1,26 @@
+# Secrets — this repository is public. Nothing sensitive may be committed.
+.env
+.env.*
+*.env
+.envrc
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.netrc
+id_rsa*
+id_ed25519*
+*_token
+*.token
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local scratch
+tmp/
+*.log
+*.bak
