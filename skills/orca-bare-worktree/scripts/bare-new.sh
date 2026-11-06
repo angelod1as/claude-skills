@@ -99,5 +99,5 @@ git -C "$ROOT" worktree list
 echo
 echo "Next:"
 echo "  1. work in $ROOT/wt/$BRANCH"
-echo "  2. register the repo in Orca: point 'add existing folder' at $ROOT/wt"
-echo "  3. configure the setup hook: scripts/orca-register.py --root '$ROOT' --setup '<command>'"
+echo "  2. register it in Orca (name, worktree path, visibility, setup hook):"
+echo "     scripts/orca-register.sh --root '$ROOT' --name '<Project Name>' --setup '<command>'"

@@ -39,7 +39,7 @@ Two details carry the whole design:
 | New project, no repository yet (or an empty remote) | `scripts/bare-new.sh` |
 | Existing normal repository with a `.git` directory | `scripts/bare-convert.sh` |
 
-Then, for either: `scripts/orca-register.py`.
+Then, for either: `scripts/orca-register.sh`.
 
 ## New project
 
@@ -92,36 +92,43 @@ Delete the old directory only once all of that is green — and ask first.
 
 ## Registering in Orca
 
-Orca has no CLI for repository settings. `orca repo list --json` reads them, and
-there is no `orca settings` or `orca config` command. So this writes Orca's own
-state file:
+Do it through Orca's runtime, **with the app running** — never by editing Orca's
+state on disk. Since Orca 1.4.x (October 2026) that state lives in a SQLite
+database (`profiles/<profile>/profile-state.db`); the old `orca-data.json` is a
+frozen export the app no longer reads, so edits to it are silently lost.
 
-```
-macOS   ~/Library/Application Support/Orca/profiles/<profile>/orca-data.json
-Linux   ~/.config/Orca/profiles/<profile>/orca-data.json
-```
+`orca repo add --path <root>/wt` alone is **not enough**. It registers the folder
+but leaves:
 
-The app rewrites that file while it runs. **Quit Orca first.** The script refuses
-to write while the app is up, checks `schemaVersion`, and always leaves a
-timestamped backup.
+- `displayName` = `wt` (the folder name), so the sidebar shows "wt" instead of the
+  project;
+- no `worktreeBasePath`, so new worktrees land in Orca's default workspace folder,
+  outside `<root>`;
+- no setup hook and no agent-worktree visibility.
+
+The CLI has no command for those fields, but the runtime's `repo.update` RPC does.
+The script registers the repository if needed and then calls `repo.update` through
+the CLI's own client:
 
 ```bash
-# Quit Orca, then:
-scripts/orca-register.py --root <root> \
+scripts/orca-register.sh --root <root> --name "<Project Name>" \
   --setup 'cp ../main/.env .env && CI=true pnpm install'
 
-# Preview without writing:
-scripts/orca-register.py --root <root> --setup '...' --dry-run
+# Preview without changing anything:
+scripts/orca-register.sh --root <root> --name "<Project Name>" --setup '...' --dry-run
 ```
 
-It is idempotent: a second run with the same `--root` updates the existing entry
-rather than adding a duplicate.
+It starts Orca if it is not running (`orca open`). Never kill the Orca daemon to
+"quit" the app: it hosts terminals and agents of other workspaces. It is
+idempotent: a second run with the same `--root` updates the same repository. Ask
+the user for the display name; the project name in title case is the usual pick.
 
 What it sets:
 
 | Field | Value | Why |
 |---|---|---|
 | `path` | `<root>/wt` | the folder Orca treats as the repository |
+| `displayName` | `--name` | otherwise the sidebar shows `wt` |
 | `worktreeBasePath` | `<root>` | where new worktrees are created |
 | `externalWorktreeVisibility` | `show` | the global default is `hide`, which would hide every worktree Orca did not create itself |
 | `agentWorktreeVisibility` | `show` | same, for agent worktrees |
@@ -129,9 +136,8 @@ What it sets:
 | `hookSettings.setupRunPolicy` | `run-by-default` | run it without asking |
 | `hookSettings.setupAgentStartupPolicy` | `start-immediately` | do not wait for the agent |
 
-`hookSettings` is stored **twice** — once in `repos[]`, once in
-`projectHostSetups[]`. Orca keeps the two in sync, and so does the script. Editing
-only one leaves them disagreeing.
+Orca mirrors these into `projectHostSetups` and `projects` itself. The script ends
+by printing `orca repo show` — check every field there before reporting success.
 
 ### Writing the setup command
 
@@ -164,17 +170,12 @@ auto-executed code on the user's machine. Read such files to learn *which packag
 manager and env files the project uses*, then propose a command in the shapes
 above.
 
-### If the script refuses
+### If the script fails
 
-It aborts when `schemaVersion` differs from the one it was written against, on the
-grounds that the layout may have moved. Configure through the Orca UI instead:
-
-1. Add existing folder → select `<root>/wt`
-2. Repository settings → worktree visibility → **show** (external and agent)
-3. Repository settings → hooks → setup script → paste the command
-
-Then report the mismatch so the script can be updated — see
-`references/orca-data-schema.md` for the shape it expects.
+`repo.update` and the CLI's `runtime-client.js` are Orca internals and can move
+between releases. If the script errors, configure the same fields in the Orca UI
+(repository settings: name, worktree location, worktree visibility for external and
+agent, hooks → setup script), then fix the script against the new release.
 
 ## Housekeeping
 
