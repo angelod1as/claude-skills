@@ -103,7 +103,9 @@ Do not write foreground `sleep` loops if the harness blocks them. Prefer the blo
 
 ## Early exit
 
-Stop before n rounds, and say why in the summary, when:
+n is a ceiling, not a quota: if the first or second review already brings nothing to
+change, stop right there — do not push an empty round just to reach n. Stop before n
+rounds, and say why in the summary, when:
 
 - A round finds no new Claude comment, or the new review has nothing actionable (it
   approves, says "no findings", or everything in it is rejected).
