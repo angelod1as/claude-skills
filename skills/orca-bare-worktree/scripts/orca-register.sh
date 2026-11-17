@@ -38,7 +38,10 @@ orca_bin="$(readlink -f "$orca_bin")"
 contents="${orca_bin%/Resources/bin/orca}"
 electron="$contents/MacOS/Orca"
 cli_dir="$contents/Resources/app.asar.unpacked/out/cli"
-if [ ! -x "$electron" ] || [ ! -f "$cli_dir/runtime-client.js" ]; then
+# Orca 1.4.2xx moved the client from cli/runtime-client.js to cli/runtime/client.js.
+client_js="$cli_dir/runtime/client.js"
+[ -f "$client_js" ] || client_js="$cli_dir/runtime-client.js"
+if [ ! -x "$electron" ] || [ ! -f "$client_js" ]; then
   echo "error: could not locate Orca.app internals from $orca_bin" >&2
   exit 1
 fi
@@ -82,7 +85,7 @@ fi
 echo "==> updating repo $repo_id"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/update.mjs" <<'EOF'
-const { RuntimeClient } = await import(process.env.ORCA_CLI_DIR + '/runtime-client.js');
+const { RuntimeClient } = await import(process.env.ORCA_CLIENT_JS);
 const client = new RuntimeClient(undefined, undefined, null, null);
 const res = await client.call('repo.update', {
   repo: process.env.REPO_SELECTOR,
@@ -90,7 +93,7 @@ const res = await client.call('repo.update', {
 });
 if (!res.ok) { console.error(JSON.stringify(res, null, 1)); process.exit(1); }
 EOF
-ORCA_CLI_DIR="$cli_dir" REPO_SELECTOR="id:$repo_id" REPO_UPDATES="$updates" \
+ORCA_CLIENT_JS="$client_js" REPO_SELECTOR="id:$repo_id" REPO_UPDATES="$updates" \
   ELECTRON_RUN_AS_NODE=1 "$electron" "$tmp/update.mjs"
 
 echo "==> result"
